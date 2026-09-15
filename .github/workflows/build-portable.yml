@@ -1,0 +1,72 @@
+name: Build Win7 portable
+
+on:
+  workflow_dispatch:
+    inputs:
+      dsh_version:
+        description: 'DSH Desktop version to package (e.g. 2.0.10)'
+        required: true
+        default: '2.0.10'
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-win7-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Resolve target version
+        id: target
+        shell: pwsh
+        run: |
+          $version = '${{ github.event.inputs.dsh_version }}'
+          if ([string]::IsNullOrWhiteSpace($version)) {
+            $version = '${{ github.ref_name }}'.TrimStart('v')
+          }
+          if ([string]::IsNullOrWhiteSpace($version)) { $version = '2.0.10' }
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "packaging DSH Desktop $version"
+
+      - name: Build portable package
+        shell: pwsh
+        run: ./scripts/build-portable.ps1 -DshVersion '${{ steps.target.outputs.version }}'
+
+      - name: Show result
+        shell: pwsh
+        run: Get-ChildItem dist -File | Format-Table Name, @{ n = 'MB'; e = { [math]::Round($_.Length / 1MB, 1) } }
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsh-desktop-win7-portable-${{ steps.target.outputs.version }}
+          path: dist/*.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+          generate_release_notes: true
+          body: |
+            DSH Desktop ${{ steps.target.outputs.version }} — Windows 7 portable build.
+
+            解压后右键 `install.cmd` → 以管理员身份运行。
+            详见仓库 README。

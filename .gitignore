@@ -1,0 +1,27 @@
+# build output
+dist/
+build/
+*.zip
+*.7z
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+
+# downloaded third-party artifacts (never commit these)
+vendor-bin/
+*.msu
+KexSetup*.exe
+7zr.exe
+DSH-Desktop-*-Setup.exe
+
+# PE patch backups
+*.orig-osver
+
+# editors / OS
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+*.log

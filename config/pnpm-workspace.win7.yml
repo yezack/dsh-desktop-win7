@@ -1,0 +1,20 @@
+packages:
+  - .
+
+nodeLinker: hoisted
+autoInstallPeers: false
+minimumReleaseAgeExclude:
+  - '@linxin666/dsh-client-ui-git-graph@0.3.9'
+  - '@linxin666/dsh-client-ui-skill-explorer@0.3.9'
+  - 'dsh-mcp-panel@0.6.2'
+  - 'dsh-rewind-plugin@0.6.2'
+  - '@michengai/dsh-archive-manager@0.1.42'
+  - 'dsh-dream-skin@9.15.1'
+allowBuilds:
+  cpu-features: true
+  node-pty: true
+  ssh2: true
+  cloudflared: true
+  dsh-mcp-panel: true
+  dsh-mcp-panel@git+https://github.com/yezack/dsh-mcp-panel.git: true
+  dsh-mcp-panel@https://codeload.github.com/yezack/dsh-mcp-panel/tar.gz/d89f9666c6d6584421768e37d50b482f7f4acf30: true

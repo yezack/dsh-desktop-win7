@@ -1,0 +1,20 @@
+# Your patch layer for this dsh profile, applied after every bundle layer:
+# a top-level YAML array of loader patch entries (id-targeted config
+# overrides, disables, and insert lists; `!!js` expressions allowed).
+
+# ── chrome-devtools-mcp (CDP) ────────────────────────────────────────────
+# 离线专用：包已 vendored 到 C:\dsh\mcp\chrome-devtools，用绝对路径 node 启动，
+# 不经过 npx、不联网。与本机 cordis.patch.yml 那条等价，仅 command/args 不同。
+- insert:
+    - id: mcp-client-chrome-devtools
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: chrome-devtools
+        transport: stdio
+        command: 'C:/dsh/node24-off/node.exe'
+        args: [ 'C:/dsh/mcp/chrome-devtools/node_modules/chrome-devtools-mcp/build/src/bin/chrome-devtools-mcp.js' ]
+
+# 注意：不要动 directory-picker。桌面端（dsh-plugin-desktop/profile-pZhrTizp.js）
+# 自己把 browse 后端 + browse 界面钉进来（desktop-directory-picker-browse-host/-surface），
+# 并且断言总表里必须有 "directory-picker" 这一行；真正的 OS 文件夹对话框由 Electron
+# 主进程经 directory-picker-route 提供。任何再钉 native 的尝试都会撞 directoryPicker 服务。

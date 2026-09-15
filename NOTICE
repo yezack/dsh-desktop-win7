@@ -1,0 +1,62 @@
+NOTICE
+======
+
+This repository contains *only* build scripts, patch tooling and documentation.
+It does NOT redistribute any third-party binary.
+
+The generated portable package (.zip) is assembled at build time by downloading
+artifacts from their official release channels. If you redistribute such a
+package, you are redistributing those third-party artifacts and must comply with
+their licenses.
+
+
+1. DSH Desktop
+--------------
+Upstream:  https://github.com/anywhere-labs/dsh-desktop
+           (formerly published as anywhere-labs/deepseek-harness-desktop)
+Source of the binary used by scripts/build-portable.ps1:
+           https://github.com/anywhere-labs/deepseek-harness-desktop/releases
+Copyright: anywhere-labs and contributors.
+License:   see the LICENSE bundled inside the upstream installer and the
+           upstream repository.
+
+This project is an independent compatibility effort. It is not affiliated with,
+endorsed by, or supported by anywhere-labs or DeepSeek.
+
+
+2. VxKex NEXT
+-------------
+Upstream:  https://github.com/YuZhouRen86/VxKex-NEXT
+Source of the binary used by scripts/build-portable.ps1:
+           https://github.com/YuZhouRen86/VxKex-NEXT/releases
+Copyright: YuZhouRen86, vxiiduu and contributors.
+License:   see the upstream repository.
+
+VxKex NEXT is an API extension layer for Windows 7/8/8.1. Upstream development is
+paused until August 2027.
+
+
+3. 7-Zip / 7zr
+--------------
+Upstream:  https://www.7-zip.org/
+License:   GNU LGPL + unRAR restriction; 7zr.exe is public domain.
+Used only as a build-time and install-time extraction tool.
+
+
+4. Electron / Chromium / Node.js
+--------------------------------
+Embedded in the upstream DSH Desktop build. Their respective licenses are
+included inside the upstream package (LICENSE.electron.txt,
+LICENSES.chromium.html).
+
+
+Modifications made by this project
+----------------------------------
+The PE downlevel patch (scripts/build-portable.ps1 + tools/pe_downlevel.py)
+modifies the COFF optional header of eight x64 binaries produced by upstream:
+
+  * MajorOperatingSystemVersion / MinorOperatingSystemVersion   10.0 -> 6.1
+  * MajorSubsystemVersion        / MinorSubsystemVersion        10.0 -> 6.1
+
+This invalidates Authenticode signatures on those files. The patch is reversible:
+tools/pe_downlevel.py writes a "<file>.orig-osver" backup before touching a file.
