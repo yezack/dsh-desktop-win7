@@ -84,7 +84,7 @@ function Resolve-7Zip {
 function Get-GitHubReleaseAsset {
     param([Parameter(Mandatory)][string]$Repo, [string]$Tag = '', [Parameter(Mandatory)][string]$Pattern)
     $api = if ($Tag) { "https://api.github.com/repos/$Repo/releases/tags/$Tag" } else { "https://api.github.com/repos/$Repo/releases/latest" }
-    $release = Invoke-RestMethod -Uri $api -UseBasicParsing -Headers @{ 'User-Agent' = 'dsh-desktop-win7-build' }
+    $release = Invoke-RestMethod -Uri $api -Headers @{ 'User-Agent' = 'dsh-desktop-win7-build' }
     $asset = $release.assets | Where-Object { $_.name -like $Pattern } | Select-Object -First 1
     if (-not $asset) { throw "no asset matching '$Pattern' in $Repo release '$($release.tag_name)'" }
     return [pscustomobject]@{ Name = $asset.name; Url = $asset.browser_download_url; Tag = $release.tag_name }
