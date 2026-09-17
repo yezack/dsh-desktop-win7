@@ -16,7 +16,7 @@
 
 .EXAMPLE
     # reuse an installer that was already downloaded
-    pwsh -File scripts/build-portable.ps1 -InstallerPath C:\cache\dsh-setup.exe
+    pwsh -File scripts/build-portable.ps1 -DshVersion 2.0.10 -InstallerPath C:\cache\dsh-setup.exe
 
 .NOTES
     Requires: Python 3 (stdlib only), 7-Zip (7z.exe or 7zr.exe; auto-downloaded).
@@ -81,6 +81,13 @@ function Resolve-7Zip {
     return $local
 }
 
+function Expand-With7Zip {
+    param([Parameter(Mandatory)][string]$Archive, [Parameter(Mandatory)][string]$Destination, [Parameter(Mandatory)][string]$SevenZip)
+    if (-not (Test-Path -LiteralPath $Destination)) { New-Item -ItemType Directory -Path $Destination -Force | Out-Null }
+    & $SevenZip x $Archive "-o$Destination" -y | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "7-Zip failed to extract $Archive (exit ${LASTEXITCODE})" }
+}
+
 function Get-GitHubReleaseAsset {
     param([Parameter(Mandatory)][string]$Repo, [string]$Tag = '', [Parameter(Mandatory)][string]$Pattern)
     $api = if ($Tag) { "https://api.github.com/repos/$Repo/releases/tags/$Tag" } else { "https://api.github.com/repos/$Repo/releases/latest" }
@@ -125,14 +132,24 @@ if ($InstallerPath) {
     Invoke-Download -Uri $asset.Url -OutFile $installer
 }
 
-Write-Step 'Extract DSH Desktop (NSIS payload)'
-& $sevenZip x $installer "-o$AppWork" -y | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "7-Zip extraction failed for $installer" }
-$appExe = Join-Path $AppWork 'DSH Desktop.exe'
-if (-not (Test-Path -LiteralPath $appExe)) {
-    throw "unexpected payload layout: '$appExe' not found. Check 7-Zip output in $AppWork"
+Write-Step 'Extract DSH Desktop'
+Expand-With7Zip -Archive $installer -Destination $AppWork -SevenZip $sevenZip
+
+# electron-builder keeps the application itself in a nested archive under
+# $PLUGINSDIR (app-64.7z); the NSIS container only holds the uninstaller.
+$payload = Get-ChildItem -LiteralPath $AppWork -Recurse -Filter 'app-*.7z' -File -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($payload) {
+    Write-Ok "nested app payload: $($payload.Name) ($([math]::Round($payload.Length/1MB,1)) MB)"
+    $payloadRoot = Join-Path $AppWork 'payload'
+    Expand-With7Zip -Archive $payload.FullName -Destination $payloadRoot -SevenZip $sevenZip
+} else {
+    $payloadRoot = $AppWork
 }
-Write-Ok "payload extracted to $AppWork"
+
+$mainExe = Get-ChildItem -LiteralPath $payloadRoot -Recurse -Filter 'DSH Desktop.exe' -File -ErrorAction SilentlyContinue | Select-Object -First 1
+if (-not $mainExe) { throw "could not find 'DSH Desktop.exe' under $payloadRoot — inspect the 7-Zip output in $AppWork" }
+$AppRoot = $mainExe.Directory.FullName
+Write-Ok "application root: $AppRoot"
 
 # ------------------------------------------------------------------ vxkex
 Write-Step 'Fetch VxKex NEXT'
@@ -141,8 +158,7 @@ $vxkexInstaller = Join-Path $WorkDir $vxkexAsset.Name
 Invoke-Download -Uri $vxkexAsset.Url -OutFile $vxkexInstaller
 
 Write-Step 'Extract VxKex NEXT'
-& $sevenZip x $vxkexInstaller "-o$VxKexWork" -y | Out-Null
-if ($LASTEXITCODE -ne 0) { throw "7-Zip extraction failed for $vxkexInstaller" }
+Expand-With7Zip -Archive $vxkexInstaller -Destination $VxKexWork -SevenZip $sevenZip
 foreach ($required in @('KexSetup.exe', 'Core64\KexCfg.exe', 'Kex64\KxBase.dll')) {
     if (-not (Test-Path -LiteralPath (Join-Path $VxKexWork $required))) { throw "VxKex payload missing '$required'" }
 }
@@ -151,13 +167,12 @@ Write-Ok "VxKex $($vxkexAsset.Tag) extracted to $VxKexWork"
 # ------------------------------------------------------------------ patch
 Write-Step 'Apply PE downlevel patch (declared OS/subsystem version -> 6.1)'
 $patchTool = Join-Path $RepoRoot 'tools\pe_downlevel.py'
-Invoke-Python -Arguments @($patchTool, 'patchdir', $AppWork, '6', '1')
+Invoke-Python -Arguments @($patchTool, 'patchdir', $AppRoot, '6', '1')
 
 Write-Step 'Verify: no top-level image declares an OS version above 6.1'
 $offenders = @()
-Get-ChildItem -LiteralPath $AppWork -File | Where-Object { $_.Extension -in '.exe', '.dll', '.node' } | ForEach-Object {
+Get-ChildItem -LiteralPath $AppRoot -File | Where-Object { $_.Extension -in '.exe', '.dll', '.node' } | ForEach-Object {
     $bytes = [IO.File]::ReadAllBytes($_.FullName)
-    # cheap inline check so we do not depend on python output parsing
     if ($bytes.Length -gt 0x40 -and $bytes[0] -eq 0x4D -and $bytes[1] -eq 0x5A) {
         $peOff = [BitConverter]::ToInt32($bytes, 0x3C)
         if ($peOff + 0x40 -lt $bytes.Length) {
@@ -185,7 +200,7 @@ $stage = Join-Path $OutDir $PackageName
 if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -Force }
 New-Item -ItemType Directory -Path $stage -Force | Out-Null
 
-Move-Item -LiteralPath $AppWork -Destination (Join-Path $stage 'app')
+Move-Item -LiteralPath $AppRoot -Destination (Join-Path $stage 'app')
 Move-Item -LiteralPath $VxKexWork -Destination (Join-Path $stage 'vxkex')
 foreach ($file in @('install.cmd', 'install-portable.ps1', 'verify-win7.ps1')) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $stage -Force
