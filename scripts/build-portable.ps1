@@ -96,7 +96,7 @@ function Invoke-Python {
     if (-not $python) { $python = Get-Command python3 -ErrorAction SilentlyContinue }
     if (-not $python) { throw 'python 3 not found on PATH (required for the PE patch tooling)' }
     & $python.Source @Arguments
-    if ($LASTEXITCODE -ne 0) { throw "python exited with $LASTEXITCODE: $($Arguments -join ' ')" }
+    if ($LASTEXITCODE -ne 0) { throw "python exited with ${LASTEXITCODE}: $($Arguments -join ' ')" }
 }
 
 # ---------------------------------------------------------------- workspace
